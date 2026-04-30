@@ -4,7 +4,8 @@ from airflow import DAG
 from airflow.models.param import Param
 from airflow.operators.python import PythonOperator
 
-from weather_extractor import upload_to_gcs, fetch_weather_data
+from weather_extractor import fetch_weather_data
+from weather_transformer import flatten_weather_data
 
 default_args = {
     "owner": "Lilya",
@@ -40,62 +41,34 @@ def choose_dates(**context):
 def fetch_netherlands_weather(**context):
     start_date, end_date = choose_dates(**context)
 
-    result=fetch_weather_data(
+    return fetch_weather_data(
         lat=52.3676,
         lon=4.9010,
         city="Netherlands",
         start_date=start_date,
         end_date=end_date,
     )
-    
-    return upload_to_gcs(result["file_path"])
-
-    # return fetch_weather_data(
-    #     lat=52.3676,
-    #     lon=4.9010,
-    #     city="Netherlands",
-    #     start_date=start_date,
-    #     end_date=end_date,
-    # )
 
 def fetch_yerevan_weather(**context):
     start_date, end_date=choose_dates(**context)
-    result=fetch_weather_data(
+    return fetch_weather_data(
         lat=40.1872,
         lon=44.5152,
         city="Yerevan",
         start_date=start_date,
         end_date=end_date,
     )
-    
-    return upload_to_gcs(result["file_path"])
-    # return fetch_weather_data(
-    #     lat=40.1872,
-    #     lon=44.5152,
-    #     city="Yerevan",
-    #     start_date=start_date,
-    #     end_date=end_date,
-    # )
 
+def flatten_netherlands_weather(**context):
+    fetch_result = context["ti"].xcom_pull(task_ids="fetch_netherlands_weather")
+    return flatten_weather_data(fetch_result["file_path"])
 
-
-
-# def fetch_json_from_gcs:
-#      fetch_files_from_gcs
-#      print(json_payload)
-# #providee with raws for bgquery and destination where to keep our data in table
-# def load_to_bigquery(raws, destination, **context):
-#     bq_client = bigquery.Client() #making communication between our code and bigquery
-#     dataset_id = "weather_dataset" 
-#     table_id = "weather_data" 
-#     bq_client.load_table_from_json(
-#         raws, destination
-        
-#     )
-
+def flatten_yerevan_weather(**context):
+    fetch_result = context["ti"].xcom_pull(task_ids="fetch_yerevan_weather")
+    return flatten_weather_data(fetch_result["file_path"])
 
 with DAG(
-    dag_id="weather_two_cities",
+    dag_id="weather_two_cities_flatten",
     default_args=default_args,
     start_date=datetime(2026,4,20),
     schedule='@daily',
@@ -118,10 +91,17 @@ with DAG(
         python_callable=fetch_yerevan_weather
     )
 
-    
+    flatten_netherlands_task = PythonOperator(
+    task_id="flatten_netherlands_weather",
+    python_callable=flatten_netherlands_weather,
+    )
 
-    
-    task1  >> task2
+    flatten_yerevan_task = PythonOperator(
+        task_id="flatten_yerevan_weather",
+        python_callable=flatten_yerevan_weather,
+    )
+
+    task1 >> flatten_netherlands_task >> task2 >> flatten_yerevan_task
 
 
 

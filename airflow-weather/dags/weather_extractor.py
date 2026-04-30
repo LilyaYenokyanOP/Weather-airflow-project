@@ -6,16 +6,32 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
+from google.cloud import storage
 
-
-DEFAULT_OUTPUT_DIR = Path("/home/airflow/gcs/data/weather_outputs")
+# local file is saved in external_storage and the upload target in cloud bucket folder weather_outputs, so we have a clear separation between local and cloud storage. This also allows us to keep a local copy of the fetched data for debugging or backup purposes, while ensuring that the data is also available in the cloud for further processing and analysis.
+DEFAULT_OUTPUT_DIR = Path("/home/airflow/gcs/external_storage/weather_outputs")
+# in my current code external_storage is a loacl filesystem folder path
 # LOCAL_FALLBACK_OUTPUT_DIR = Path("/opt/airflow/logs/weather_outputs")
+# LOCAL_BACKUP_DIR = Path('/home/airflow/gcs/external_storage/weather_outputs') #local backup directory, for the local save path
+# GCS_UPLOAD_PREFIX = "data/weather_outputs/"  # prefix in GCS bucket where files will be uploaded
 
-
-
+# function below cleans city names to create safe file names, replacing spaces and special characters with underscores, and ensuring no leading or trailing underscores remain. If the cleaned name is empty, it defaults to "unknown_location".
 def _safe_file_fragment(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", value.strip())
     return cleaned.strip("_") or "unknown_location"
+
+
+# connection to gcs
+# just fetched data from local storage and upload to gcs
+# result is that fetched weather file is now in the gcs bucket
+def upload_to_gcs(local_file_path):
+    storage_client = storage.Client()  # create gcs client
+    bucket = storage_client.bucket('us-central1-weather-airflow-add1591d-bucket')  # get bucket where we keep our data
+    # Extract filename from local path for GCS blob name
+    filename = Path(local_file_path).name
+    blob = bucket.blob(f"data/weather_outputs/{filename}")  # upload to weather_outputs/ folder in GCS
+    blob.upload_from_filename(local_file_path)  # upload local file to GCS
+    print(f"Uploaded {filename} to GCS bucket {bucket.name} at data/weather_outputs/{filename}")  # Add success log
 
 
 def fetch_weather_data(
@@ -62,6 +78,7 @@ def fetch_weather_data(
     safe_city = _safe_file_fragment(city)
     file_name = f"weather_in_{safe_city}_from_{start_date}_to_{end_date}.json"
     destination_dir.mkdir(parents=True, exist_ok=True)
+    destination_dir = output_dir or LOCAL_BACKUP_DIR
     file_path = destination_dir / file_name
 
     with file_path.open("w", encoding="utf-8") as file:
@@ -89,7 +106,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     
-    fetch_weather_data(
+    result=fetch_weather_data(
         lat=args.lat,
         lon=args.lon,
         city=args.city,
@@ -97,4 +114,8 @@ if __name__ == "__main__":
         end_date=args.end,
         output_dir=args.output_dir,
     )
+    
+    upload_to_gcs(result["file_path"])
+
+    
    
