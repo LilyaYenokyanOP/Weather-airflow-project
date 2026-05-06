@@ -36,7 +36,8 @@ def flatten_weather_data(input_file_path, output_dir=None):
     output_path = destination_dir / output_file_name
 
     with output_path.open("w", encoding="utf-8") as file:
-        json.dump(flattened_rows, file, indent=4)
+        for row in flattened_rows:
+            file.write(json.dumps(row) + "\n")
 
     print(f"Saved flattened data to {output_path}")
 

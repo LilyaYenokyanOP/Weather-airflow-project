@@ -6,13 +6,13 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
-from google.cloud import storage
+from google.cloud import storage, bigquery
 
 # local file is saved in external_storage and the upload target in cloud bucket folder weather_outputs, so we have a clear separation between local and cloud storage. This also allows us to keep a local copy of the fetched data for debugging or backup purposes, while ensuring that the data is also available in the cloud for further processing and analysis.
 DEFAULT_OUTPUT_DIR = Path("/home/airflow/gcs/external_storage/weather_outputs")
 # in my current code external_storage is a loacl filesystem folder path
 # LOCAL_FALLBACK_OUTPUT_DIR = Path("/opt/airflow/logs/weather_outputs")
-# LOCAL_BACKUP_DIR = Path('/home/airflow/gcs/external_storage/weather_outputs') #local backup directory, for the local save path
+LOCAL_BACKUP_DIR = Path('/home/airflow/gcs/external_storage/weather_outputs') #local backup directory, for the local save path
 # GCS_UPLOAD_PREFIX = "data/weather_outputs/"  # prefix in GCS bucket where files will be uploaded
 
 # function below cleans city names to create safe file names, replacing spaces and special characters with underscores, and ensuring no leading or trailing underscores remain. If the cleaned name is empty, it defaults to "unknown_location".
@@ -21,17 +21,6 @@ def _safe_file_fragment(value: str) -> str:
     return cleaned.strip("_") or "unknown_location"
 
 
-# connection to gcs
-# just fetched data from local storage and upload to gcs
-# result is that fetched weather file is now in the gcs bucket
-def upload_to_gcs(local_file_path):
-    storage_client = storage.Client()  # create gcs client
-    bucket = storage_client.bucket('us-central1-weather-airflow-add1591d-bucket')  # get bucket where we keep our data
-    # Extract filename from local path for GCS blob name
-    filename = Path(local_file_path).name
-    blob = bucket.blob(f"data/weather_outputs/{filename}")  # upload to weather_outputs/ folder in GCS
-    blob.upload_from_filename(local_file_path)  # upload local file to GCS
-    print(f"Uploaded {filename} to GCS bucket {bucket.name} at data/weather_outputs/{filename}")  # Add success log
 
 
 def fetch_weather_data(
@@ -78,7 +67,7 @@ def fetch_weather_data(
     safe_city = _safe_file_fragment(city)
     file_name = f"weather_in_{safe_city}_from_{start_date}_to_{end_date}.json"
     destination_dir.mkdir(parents=True, exist_ok=True)
-    destination_dir = output_dir or LOCAL_BACKUP_DIR
+    # destination_dir = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
     file_path = destination_dir / file_name
 
     with file_path.open("w", encoding="utf-8") as file:
@@ -91,6 +80,40 @@ def fetch_weather_data(
         "start_date": start_date,
         "end_date": end_date,
     }
+
+# connection to gcs
+# just fetched data from local storage and upload to gcs
+# result is that fetched weather file is now in the gcs bucket
+def upload_to_gcs(local_file_path):
+    storage_client = storage.Client()  # create gcs client
+    bucket = storage_client.bucket('us-central1-weather-airflow-add1591d-bucket')  # get bucket where we keep our data
+    # Extract filename from local path for GCS blob name
+    filename = Path(local_file_path).name
+    blob = bucket.blob(f"data/weather_flattened/{filename}")  # upload to weather_flattened/ folder in GCS
+    blob.upload_from_filename(local_file_path)  # upload local file to GCS
+    print(f"Uploaded {filename} to GCS bucket {bucket.name} at data/weather_flattened/{filename}")  # Add success log
+
+
+# upload from gcs bucket files to bigquery tables
+def load_to_bigquery(gcs_file_path, dataset_id, table_id):
+    client = bigquery.Client()
+    table_ref= client.dataset(dataset_id).table(table_id)
+
+    job_config = bigquery.LoadJobConfig(
+        source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        write_disposition = bigquery.WriteDisposition.WRITE_APPEND,  # Append to existing table
+        autodetect =False,  # Disable autodetect to ensure schema is defined explicitly
+    )
+
+    # this load_job is going the exact gcs bucket file and moving it into our dataset->table
+    load_job=client.load_table_from_uri(
+        gcs_file_path,
+        table_ref,
+        job_config=job_config
+    )
+
+    load_job.result()  # Wait for the job to complete
+    print(f"Loaded data from {gcs_file_path} to BigQuery table {dataset_id}.{table_id}")
 
 
 if __name__ == "__main__":

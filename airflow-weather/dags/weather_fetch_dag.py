@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from airflow import DAG
 from airflow.models.param import Param
 from airflow.operators.python import PythonOperator
 
-from weather_extractor import upload_to_gcs, fetch_weather_data
+from weather_extractor import upload_to_gcs, fetch_weather_data,load_to_bigquery
+from weather_transformer import flatten_weather_data
 
 default_args = {
     "owner": "Lilya",
@@ -48,7 +50,8 @@ def fetch_netherlands_weather(**context):
         end_date=end_date,
     )
     
-    return upload_to_gcs(result["file_path"])
+    upload_to_gcs(result["file_path"])
+    return result
 
     # return fetch_weather_data(
     #     lat=52.3676,
@@ -57,6 +60,22 @@ def fetch_netherlands_weather(**context):
     #     start_date=start_date,
     #     end_date=end_date,
     # )
+
+def load_netherlands_to_bigquery(**context):
+    flatten_result = context["ti"].xcom_pull(task_ids="flatten_netherlands_weather")
+    flattened_file_path = flatten_result["output_file"]
+    upload_to_gcs(flattened_file_path)
+
+    gcs_file_path=(
+        f"gs://us-central1-weather-airflow-add1591d-bucket/"
+        f"data/weather_outputs/{Path(flattened_file_path).name}"
+    )
+
+    load_to_bigquery(
+        gcs_file_path=gcs_file_path,
+        dataset_id="bronze",
+        table_id="weather_raw_flattened"
+    )
 
 def fetch_yerevan_weather(**context):
     start_date, end_date=choose_dates(**context)
@@ -68,7 +87,8 @@ def fetch_yerevan_weather(**context):
         end_date=end_date,
     )
     
-    return upload_to_gcs(result["file_path"])
+    upload_to_gcs(result["file_path"])
+    return result
     # return fetch_weather_data(
     #     lat=40.1872,
     #     lon=44.5152,
@@ -77,8 +97,30 @@ def fetch_yerevan_weather(**context):
     #     end_date=end_date,
     # )
 
+def load_yerevan_to_bigquery(**context):
+    flatten_result = context["ti"].xcom_pull(task_ids="flatten_yerevan_weather")
+    flattened_file_path = flatten_result["output_file"]
+    upload_to_gcs(flattened_file_path)
 
+    gcs_file_path=(
+        f"gs://us-central1-weather-airflow-add1591d-bucket/"
+        f"data/weather_outputs/{Path(flattened_file_path).name}"
+    )
 
+    load_to_bigquery(
+        gcs_file_path=gcs_file_path,
+        dataset_id="bronze",
+        table_id="weather_raw_flattened"
+    )
+
+def flatten_netherlands_weather(**context):
+    fetch_result = context["ti"].xcom_pull(task_ids="fetch_netherlands_weather")
+    # fetch_result = 
+    return flatten_weather_data(fetch_result["file_path"])
+
+def flatten_yerevan_weather(**context):
+    fetch_result = context["ti"].xcom_pull(task_ids="fetch_yerevan_weather")
+    return flatten_weather_data(fetch_result["file_path"])
 
 # def fetch_json_from_gcs:
 #      fetch_files_from_gcs
@@ -95,7 +137,7 @@ def fetch_yerevan_weather(**context):
 
 
 with DAG(
-    dag_id="weather_two_cities",
+    dag_id="weather_two_cities_to_bigquery",
     default_args=default_args,
     start_date=datetime(2026,4,20),
     schedule='@daily',
@@ -108,20 +150,35 @@ with DAG(
     }
 ) as dag:
 
-    task1=PythonOperator(
+    fetch_netherlands_weather_task=PythonOperator(
         task_id='fetch_netherlands_weather',
         python_callable=fetch_netherlands_weather
     )
-
-    task2=PythonOperator(
-        task_id='fetch_yerevan_weather',
-        python_callable=fetch_yerevan_weather
+    flatten_netherlands_task = PythonOperator(
+    task_id="flatten_netherlands_weather",
+    python_callable=flatten_netherlands_weather,
     )
 
     
+    load_netherlands_to_bigquery_task=PythonOperator(
+        task_id='load_netherlands_to_bigquery',
+        python_callable=load_netherlands_to_bigquery
+    )
+    fetch_yerevan_weather_task=PythonOperator(
+        task_id='fetch_yerevan_weather',
+        python_callable=fetch_yerevan_weather
+    )
+    flatten_yerevan_task = PythonOperator(
+        task_id="flatten_yerevan_weather",
+        python_callable=flatten_yerevan_weather,
+    )
+    load_yerevan_to_bigquery_task=PythonOperator(
+        task_id='load_yerevan_to_bigquery',
+        python_callable=load_yerevan_to_bigquery
+    )
 
-    
-    task1  >> task2
+    fetch_netherlands_weather_task >> flatten_netherlands_task >> load_netherlands_to_bigquery_task
+    fetch_yerevan_weather_task >> flatten_yerevan_task >> load_yerevan_to_bigquery_task
 
 
 
@@ -155,4 +212,3 @@ with DAG(
 #     )
 
 #     task1 >> task2
-
