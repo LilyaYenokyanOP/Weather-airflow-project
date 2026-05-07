@@ -143,6 +143,7 @@ with DAG(
             "source_task_id": "process_yerevan_weather",
         }
         )
+        
     bronze_to_silver_task = BigQueryInsertJobOperator(
     task_id="bronze_to_silver_weather",
     configuration={
