@@ -1,5 +1,6 @@
 # task1 = fetch data in memory->flatten data in memory-> upload flatten data to gcs
 # task2 = upload from gcs to bigquery
+#task3= from bronze dataset upload cleaned and deduplicated data to silver dataset
 
 # process_netherlands_task >> load_netherlands_task
 # process_yerevan_task >> load_yerevan_task
@@ -11,6 +12,8 @@ import sys
 from airflow import DAG
 from airflow.models.param import Param
 from airflow.operators.python import PythonOperator
+
+from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
 sys.path.append(str(Path(__file__).resolve().parent))
 
@@ -139,8 +142,19 @@ with DAG(
         op_kwargs={
             "source_task_id": "process_yerevan_weather",
         }
-    )
+        )
+    bronze_to_silver_task = BigQueryInsertJobOperator(
+    task_id="bronze_to_silver_weather",
+    configuration={
+        "query": {
+            "query": "{% include 'sql/weather_bronze_to_silver.sql' %}",
+            "useLegacySql": False,
+        }
+    },
+)
 
-    process_netherlands_task >> load_netherlands_task
-    process_yerevan_task >> load_yerevan_task
+
+
+    process_netherlands_task >> load_netherlands_task >> bronze_to_silver_task
+    process_yerevan_task >> load_yerevan_task >> bronze_to_silver_task
 

@@ -69,7 +69,7 @@ def flatten_weather_in_memory(weather_data, city, batch_id, ingested_at):
     return rows
 
 
-# 3.upload flattened data to gcs
+# # 3.upload flattened data to gcs
 def upload_flattened_to_gcs(flattened_rows, city, start_date, end_date):
     storage_client = storage.Client()
     bucket = storage_client.bucket(BUCKET_NAME)
@@ -86,7 +86,7 @@ def upload_flattened_to_gcs(flattened_rows, city, start_date, end_date):
     blob.upload_from_string(ndjson_text, content_type="application/json")
 
     gcs_file_path = f"gs://{bucket.name}/{blob_path}"
-    print(f"Uploaded flattened data to GCS at {gcs_file_path}")
+    print(f"Uploaded {len(flattened_rows)} flattened rows to GCS at {gcs_file_path}")
     return gcs_file_path
 
 
@@ -108,7 +108,7 @@ def upload_to_bigquery(gcs_file_path, dataset_id, table_id):
     )
 
     load_job.result()
-    print(f"Loaded data from {gcs_file_path} to BigQuery table {dataset_id}.{table_id}")
+    print(f"Loaded {load_job.output_rows} rows from {gcs_file_path} to BigQuery table {dataset_id}.{table_id}")
 
 # testing fetched data
 # if __name__ == "__main__":
@@ -116,7 +116,7 @@ def upload_to_bigquery(gcs_file_path, dataset_id, table_id):
 #         lat=52.3676,
 #         lon=4.9010,
 #         city="Netherlands",
-#         start_date="2026-05-05",
+#         start_date="2026-05-01",
 #         end_date="2026-05-05",
 #     )
 
@@ -133,11 +133,11 @@ def upload_to_bigquery(gcs_file_path, dataset_id, table_id):
 #         lat=52.3676,
 #         lon=4.9010,
 #         city="Netherlands",
-#         start_date="2026-05-05",
+#         start_date="2026-05-01",
 #         end_date="2026-05-05",
 #     )
 
 #     flattened_rows = flatten_weather_in_memory(result, city="Netherlands")
 
 #     print(f"Flattened rows: {len(flattened_rows)}")
-#     print(json.dumps(flattened_rows[:3], indent=4))
+#     print(json.dumps(flattened_rows[:48], indent=4))
