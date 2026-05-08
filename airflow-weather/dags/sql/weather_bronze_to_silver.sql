@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `weather-project-4567.silver.weather_cleaned`
     batch_id STRING,
     ingested_at TIMESTAMP
 )
-PARTITION BY DATE(ingested_at)
+PARTITION BY DATE(weather_timestamp)
 CLUSTER BY city, batch_id;
 
 
@@ -79,7 +79,7 @@ deduplicated_data AS(
         SELECT
             *,
             ROW_NUMBER() OVER (
-                PARTITION BY city, `weather_timestamp`
+                PARTITION BY city, weather_timestamp
                 ORDER BY ingested_at DESC
             ) AS rn
         FROM cleaned_data

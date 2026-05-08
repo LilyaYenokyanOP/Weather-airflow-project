@@ -15,7 +15,10 @@ from airflow.operators.python import PythonOperator
 
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
-sys.path.append(str(Path(__file__).resolve().parent))
+_DAG_FILE = Path(__file__).resolve()
+_DAGS_ROOT = _DAG_FILE.parent # .../dags/ — contains sql/
+
+sys.path.append(str(_DAG_FILE.parent))
 
 from weather_memory_extractor import (
     fetch_weather_in_memory,
@@ -96,10 +99,11 @@ def load_city_to_bigquery(source_task_id, **context):
 
 
 with DAG(
-    dag_id = "weather_two_cities_in_memory_to_bigquery",
+    dag_id = "weather_two_cities_bronze_to_silver",
     default_args= default_args,
     start_date = datetime(2026, 5, 5),
     schedule='@daily',
+    template_searchpath=[str(_DAGS_ROOT)],
     catchup=False,
     params={
         "mode": Param("today", type='string', enum=['today', 'specific_day', 'date_range']),
@@ -145,14 +149,14 @@ with DAG(
         )
         
     bronze_to_silver_task = BigQueryInsertJobOperator(
-    task_id="bronze_to_silver_weather",
-    configuration={
-        "query": {
-            "query": "{% include 'sql/weather_bronze_to_silver.sql' %}",
-            "useLegacySql": False,
-        }
-    },
-)
+        task_id="bronze_to_silver_weather",
+        configuration={
+            "query": {
+                "query": "{% include 'sql/weather_bronze_to_silver.sql' %}",
+                "useLegacySql": False,
+            }
+        },
+    )
 
 
 
