@@ -99,7 +99,7 @@ def load_city_to_bigquery(source_task_id, **context):
 
 
 with DAG(
-    dag_id = "weather_two_cities_bronze_to_silver",
+    dag_id = "weather_two_cities_bronze_silver_gold",
     default_args= default_args,
     start_date = datetime(2026, 5, 5),
     schedule='@daily',
@@ -149,17 +149,30 @@ with DAG(
         )
         
     bronze_to_silver_task = BigQueryInsertJobOperator(
-        task_id="bronze_to_silver_weather",
-        configuration={
-            "query": {
-                "query": "{% include 'sql/weather_bronze_to_silver.sql' %}",
-                "useLegacySql": False,
-            }
-        },
+    task_id="bronze_to_silver_weather",
+    configuration={
+        "query": {
+            "query": "{% include 'sql/weather_bronze_to_silver.sql' %}",
+            "useLegacySql": False,
+        }
+    },
     )
+    create_gold_tables_task = BigQueryInsertJobOperator(
+    task_id="create_gold_tables",
+    configuration={
+        "query": {
+            "query": "{% include 'sql/create_gold_weather_tables.sql' %}",
+            "useLegacySql": False,
+        }
+    },
+    
+    
+)
 
 
 
     process_netherlands_task >> load_netherlands_task >> bronze_to_silver_task
     process_yerevan_task >> load_yerevan_task >> bronze_to_silver_task
+
+    bronze_to_silver_task >> create_gold_tables_task
 
