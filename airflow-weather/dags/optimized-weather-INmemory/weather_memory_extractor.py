@@ -12,7 +12,8 @@ from urllib.request import urlopen
 from google.cloud import storage, bigquery
 
 
-BUCKET_NAME = "us-central1-weather-airflow-add1591d-bucket"
+# BUCKET_NAME = "us-central1-weather-airflow-add1591d-bucket"
+BUCKET_NAME = "us-central1-weather-airflow-4c2c14a3-bucket"
 
 
 def _safe_file_fragment(value):

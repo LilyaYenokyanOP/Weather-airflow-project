@@ -101,15 +101,15 @@ def load_city_to_bigquery(source_task_id, **context):
 with DAG(
     dag_id = "weather_two_cities_bronze_silver_gold",
     default_args= default_args,
-    start_date = datetime(2026, 5, 5),
-    schedule='@daily',
+    start_date = datetime(2026, 5, 21),
+    schedule=None,
     template_searchpath=[str(_DAGS_ROOT)],
     catchup=False,
     params={
         "mode": Param("today", type='string', enum=['today', 'specific_day', 'date_range']),
-        "target_date": Param('2026-04-22', type='string', format='date'),
-        "start_date": Param('2026-04-22', type='string', format='date'),
-        "end_date": Param('2026-04-22', type='string', format='date')
+        "target_date": Param('2026-05-21', type='string', format='date'),
+        "start_date": Param('2026-05-21', type='string', format='date'),
+        "end_date": Param('2026-05-21', type='string', format='date')
     }
 )as dag:
     process_netherlands_task = PythonOperator(
@@ -157,6 +157,7 @@ with DAG(
         }
     },
     )
+
     create_gold_tables_task = BigQueryInsertJobOperator(
     task_id="create_gold_tables",
     configuration={

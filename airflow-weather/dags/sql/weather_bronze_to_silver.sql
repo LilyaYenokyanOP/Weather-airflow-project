@@ -39,7 +39,7 @@
 
 
 -- optimized query 
-CREATE TABLE IF NOT EXISTS `weather-project-4567.silver.weather_cleaned`
+CREATE TABLE IF NOT EXISTS `weather-project-497009.silver.weather_cleaned`
 (
     city STRING,
     latitude FLOAT64,
@@ -54,7 +54,7 @@ PARTITION BY DATE(weather_timestamp)
 CLUSTER BY city, batch_id;
 
 
-INSERT INTO `weather-project-4567.silver.weather_cleaned`
+INSERT INTO `weather-project-497009.silver.weather_cleaned`
 WITH cleaned_data AS(
     SELECT 
     TRIM(city) as city,
@@ -67,7 +67,7 @@ WITH cleaned_data AS(
 
         batch_id,
         ingested_at
-    FROM `weather-project-4567.bronze.weather_raw_flattened_partitioned`
+    FROM `weather-project-497009.bronze.weather_raw_flattened_partitioned`
     WHERE city is not null
     AND temperature_2m is not null
     AND SAFE.PARSE_TIMESTAMP('%Y-%m-%dT%H:%M', `timestamp`) IS NOT NULL
