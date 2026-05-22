@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `weather-project-497009.data_mart.mart_daily_table` PARTITION BY DATE(weather_date) AS
+CREATE OR REPLACE TABLE `weather-project-497009.data_mart.mart_daily_table` PARTITION BY DATE(weather_date) AS
 SELECT d.city_id,
        city,
        timezone,
@@ -13,3 +13,5 @@ JOIN `weather-project-497009.gold.dim_city` as d
 ON d.city_id=f.city_id
 GROUP BY city_id, city, timezone, weather_date
 ORDER BY city_id, weather_date DESC;
+
+

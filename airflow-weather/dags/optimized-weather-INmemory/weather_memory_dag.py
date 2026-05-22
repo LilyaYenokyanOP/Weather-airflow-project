@@ -166,14 +166,21 @@ with DAG(
             "useLegacySql": False,
         }
     },
-    
-    
+    )
+
+    create_mart_daily_table_task = BigQueryInsertJobOperator(
+    task_id="create_mart_daily_table",
+    configuration={
+        "query": {
+            "query": "{% include 'sql/mart_daily_table.sql' %}",
+            "useLegacySql": False,
+        }
+    },
 )
-
-
-
+    
+    
     process_netherlands_task >> load_netherlands_task >> bronze_to_silver_task
     process_yerevan_task >> load_yerevan_task >> bronze_to_silver_task
 
-    bronze_to_silver_task >> create_gold_tables_task
+    bronze_to_silver_task >> create_gold_tables_task >> create_mart_daily_table_task
 
