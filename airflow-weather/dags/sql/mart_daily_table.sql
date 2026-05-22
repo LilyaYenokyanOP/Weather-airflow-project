@@ -1,4 +1,4 @@
-CREATE OR REPLACE TABLE `weather-project-497009.data_mart.mart_daily_table` PARTITION BY DATE(weather_date) AS
+CREATE OR REPLACE TABLE `weather-project-497009.data_mart.mart_daily_table` AS
 SELECT d.city_id,
        city,
        timezone,
