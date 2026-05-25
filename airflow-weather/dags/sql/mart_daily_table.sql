@@ -14,4 +14,3 @@ ON d.city_id=f.city_id
 GROUP BY city_id, city, timezone, weather_date
 ORDER BY city_id, weather_date DESC;
 
-
