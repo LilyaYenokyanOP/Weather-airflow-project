@@ -96,10 +96,27 @@ def upload_to_bigquery(gcs_file_path, dataset_id, table_id):
     client = bigquery.Client()
     table_ref = client.dataset(dataset_id).table(table_id)
 
+    schema=[
+            bigquery.SchemaField("city", "STRING"),
+            bigquery.SchemaField("latitude", "FLOAT"),
+            bigquery.SchemaField("longitude", "FLOAT"),
+            bigquery.SchemaField("timezone", "STRING"),
+            bigquery.SchemaField("timestamp", "STRING"),
+            bigquery.SchemaField("temperature_2m", "FLOAT"),
+            bigquery.SchemaField("batch_id", "STRING"),
+            bigquery.SchemaField("ingested_at", "TIMESTAMP"),
+        ]
     job_config = bigquery.LoadJobConfig(
+        schema=schema,
+        autodetect=False,
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        autodetect=False
+        time_partitioning=bigquery.TimePartitioning(
+            type_=bigquery.TimePartitioningType.DAY,
+            field="ingested_at",
+        ),
+        clustering_fields=["city", "batch_id"],
     )
 
     load_job = client.load_table_from_uri(

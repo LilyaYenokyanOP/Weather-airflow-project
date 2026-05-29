@@ -10,6 +10,8 @@ from pathlib import Path
 import sys
 
 from airflow import DAG
+
+
 from airflow.models.param import Param
 from airflow.operators.python import PythonOperator
 
@@ -33,9 +35,10 @@ default_args = {
     "owner": "Lilya",
     "depends_on_past": False,
     "email_on_failure": False,
-    "retries": 1,
+    "retries": 2,
     "retry_delay": timedelta(minutes=5),
 }
+
 
 def choose_dates(**context):
     params=context['params']
