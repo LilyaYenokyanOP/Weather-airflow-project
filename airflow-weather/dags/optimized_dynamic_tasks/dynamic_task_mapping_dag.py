@@ -107,9 +107,6 @@ CITIES = [
     {"lat": 37.7749, "lon": -122.4194, "city": "San Francisco"},
     {"lat": 48.8566, "lon": 2.3522, "city": "Paris"},
     {"lat": 51.5074, "lon": -0.1278, "city": "London"},
-    {"lat": 35.6895, "lon": 139.6917, "city": "Tokyo"},
-    {"lat": 34.0522, "lon": -118.2437, "city": "Los Angeles"},
-    {"lat": 40.7128, "lon": -74.0060, "city": "New York"},
 ]
 
 
@@ -131,7 +128,7 @@ with DAG(
     process_city_weather_task = PythonOperator.partial(
         task_id="process_city_weather",
         python_callable=process_city_weather,
-    ).expand_kwargs(CITIES)
+    ).expand(op_kwargs=CITIES)
 
     load_city_to_bigquery_task = PythonOperator.partial(
         task_id="load_city_to_bigquery",
