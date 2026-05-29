@@ -102,7 +102,7 @@ def load_city_to_bigquery_mapped(**context):
 
 
 CITIES = [
-    {"lat": 52.3676, "lon": 4.9010, "city": "Netherlands"},
+    {"lat": 52.3676, "lon": 4.9010, "city": "Amsterdam"},
     {"lat": 40.1872, "lon": 44.5152, "city": "Yerevan"},
     {"lat": 37.7749, "lon": -122.4194, "city": "San Francisco"},
     {"lat": 48.8566, "lon": 2.3522, "city": "Paris"},
@@ -110,8 +110,6 @@ CITIES = [
     {"lat": 35.6895, "lon": 139.6917, "city": "Tokyo"},
     {"lat": 34.0522, "lon": -118.2437, "city": "Los Angeles"},
     {"lat": 40.7128, "lon": -74.0060, "city": "New York"},
-    {"lat": 37.7749, "lon": -122.4194, "city": "San Francisco"},
-    {"lat": 48.8566, "lon": 2.3522, "city": "Paris"},
 ]
 
 
