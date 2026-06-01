@@ -8,9 +8,9 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
 _DAG_FILE = Path(__file__).resolve()
-_DAGS_ROOT = _DAG_FILE.parent
-_HELPER_DIR = _DAG_FILE.parent / "optimized_dynamic_tasks"
-sys.path.insert(0, str(_HELPER_DIR))
+_PIPELINE_ROOT = _DAG_FILE.parent
+_LIB_DIR = _PIPELINE_ROOT / "lib"
+sys.path.insert(0, str(_LIB_DIR))
 
 from weather_dynamic_task_mapping import (
     fetch_weather_data,
@@ -99,8 +99,8 @@ CITIES = [
     {"lat": 52.3676, "lon": 4.9010, "city": "Amsterdam"},
     {"lat": 40.1872, "lon": 44.5152, "city": "Yerevan"},
     {"lat": 37.7749, "lon": -122.4194, "city": "San Francisco"},
-    {"lat": 48.8566, "lon": 2.3522, "city": "Paris"},
-    {"lat": 51.5074, "lon": -0.1278, "city": "London"},
+    # {"lat": 48.8566, "lon": 2.3522, "city": "Paris"},
+    # {"lat": 51.5074, "lon": -0.1278, "city": "London"},
 ]
 
 
@@ -109,7 +109,7 @@ with DAG(
     default_args=default_args,
     start_date=datetime(2026, 5, 29),
     schedule=None,
-    template_searchpath=[str(_DAGS_ROOT)],
+    template_searchpath=[str(_PIPELINE_ROOT)],
     catchup=False,
     params={
         "mode": Param("today", type="string", enum=["today", "specific_day", "date_range"]),
