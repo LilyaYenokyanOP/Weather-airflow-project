@@ -1,7 +1,3 @@
-"""
-Composer / GCS often syncs this path: dags/dynamic_task_mapping_dag.py (bucket root).
-Helpers live in dags/optimized_dynamic_tasks/weather_dynamic_task_mapping.py.
-"""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
