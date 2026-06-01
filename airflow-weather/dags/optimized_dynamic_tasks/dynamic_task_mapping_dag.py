@@ -1,21 +1,20 @@
+"""
+Composer / GCS often syncs this path: dags/dynamic_task_mapping_dag.py (bucket root).
+Helpers live in dags/optimized_dynamic_tasks/weather_dynamic_task_mapping.py.
+"""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 
 from airflow import DAG
-
-
 from airflow.models.param import Param
 from airflow.operators.python import PythonOperator
-
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
 _DAG_FILE = Path(__file__).resolve()
-# Jinja {% include 'sql/...' %} resolves against template_searchpath.
-# SQL files live under dags/sql/, so use the dags/ folder (parent of this package).
-_DAGS_ROOT = _DAG_FILE.parent.parent
-
-sys.path.append(str(_DAG_FILE.parent))
+_DAGS_ROOT = _DAG_FILE.parent
+_HELPER_DIR = _DAG_FILE.parent / "optimized_dynamic_tasks"
+sys.path.insert(0, str(_HELPER_DIR))
 
 from weather_dynamic_task_mapping import (
     fetch_weather_data,
@@ -23,7 +22,6 @@ from weather_dynamic_task_mapping import (
     upload_flattened_to_gcs,
     upload_to_bigquery,
 )
-
 
 default_args = {
     "owner": "Lilya",
@@ -35,33 +33,34 @@ default_args = {
 
 
 def choose_dates(**context):
-    params=context['params']
-    mode = params['mode']
-    run_date=context['ds']
+    params = context["params"]
+    mode = params["mode"]
+    run_date = context["ds"]
 
-    if mode=="today":
-        start_date=run_date
-        end_date=run_date
+    if mode == "today":
+        start_date = run_date
+        end_date = run_date
     elif mode == "specific_day":
-        start_date=params['target_date']
-        end_date=params['target_date']
+        start_date = params["target_date"]
+        end_date = params["target_date"]
     elif mode == "date_range":
-        start_date=params['start_date']
-        end_date=params['end_date']
+        start_date = params["start_date"]
+        end_date = params["end_date"]
     else:
-        raise ValueError('mode must be today, specific_day or date_range')
+        raise ValueError("mode must be today, specific_day or date_range")
 
     if start_date > end_date:
         raise ValueError("start_date must be earlier than or equal to end_date")
-    
+
     return start_date, end_date
+
 
 def process_city_weather(lat, lon, city, **context):
     start_date, end_date = choose_dates(**context)
     batch_id = context["run_id"]
     ingested_at = datetime.now(timezone.utc).isoformat()
 
-    weather_data =fetch_weather_data(
+    weather_data = fetch_weather_data(
         lat=lat,
         lon=lon,
         city=city,
@@ -69,14 +68,14 @@ def process_city_weather(lat, lon, city, **context):
         end_date=end_date,
     )
 
-    flattened_rows=flatten_weather_data(
+    flattened_rows = flatten_weather_data(
         weather_data=weather_data,
         city=city,
         batch_id=batch_id,
         ingested_at=ingested_at,
     )
 
-    gcs_file_path=upload_flattened_to_gcs(
+    gcs_file_path = upload_flattened_to_gcs(
         flattened_rows=flattened_rows,
         city=city,
         start_date=start_date,
@@ -85,14 +84,13 @@ def process_city_weather(lat, lon, city, **context):
 
     return gcs_file_path
 
+
 def load_city_to_bigquery_mapped(**context):
-    
     ti = context["ti"]
-    map_index = ti.map_index
     gcs_file_path = ti.xcom_pull(
         task_ids="process_city_weather",
         key="return_value",
-        map_index=map_index,
+        map_indexes=ti.map_index,
     )
     upload_to_bigquery(
         gcs_file_path=gcs_file_path,
@@ -111,24 +109,24 @@ CITIES = [
 
 
 with DAG(
-    dag_id = "dynamic_task_mapping_cities",
-    default_args= default_args,
-    start_date = datetime(2026, 5, 29),
-    schedule = None,
+    dag_id="dynamic_task_mapping_cities",
+    default_args=default_args,
+    start_date=datetime(2026, 5, 29),
+    schedule=None,
     template_searchpath=[str(_DAGS_ROOT)],
-    catchup = False,
+    catchup=False,
     params={
-        "mode": Param("today", type='string', enum=['today', 'specific_day', 'date_range']),
-        "target_date": Param('2026-05-29', type='string', format='date'),
-        "start_date": Param('2026-05-29', type='string', format='date'),
-        "end_date": Param('2026-05-29', type='string', format='date')
-    }
+        "mode": Param("today", type="string", enum=["today", "specific_day", "date_range"]),
+        "target_date": Param("2026-05-29", type="string", format="date"),
+        "start_date": Param("2026-05-29", type="string", format="date"),
+        "end_date": Param("2026-05-29", type="string", format="date"),
+    },
 ) as dag:
-    
+    # expand_kwargs: each dict must be valid PythonOperator kwargs only — put lat/lon/city inside op_kwargs.
     process_city_weather_task = PythonOperator.partial(
         task_id="process_city_weather",
         python_callable=process_city_weather,
-    ).expand(op_kwargs=CITIES)
+    ).expand_kwargs([{"op_kwargs": city} for city in CITIES])
 
     load_city_to_bigquery_task = PythonOperator.partial(
         task_id="load_city_to_bigquery",
@@ -137,7 +135,6 @@ with DAG(
 
     process_city_weather_task >> load_city_to_bigquery_task
 
-   
     bronze_to_silver_task = BigQueryInsertJobOperator(
         task_id="bronze_to_silver_weather",
         configuration={
@@ -170,4 +167,3 @@ with DAG(
 
     load_city_to_bigquery_task >> bronze_to_silver_task
     bronze_to_silver_task >> create_gold_tables_task >> create_mart_daily_table_task
-
